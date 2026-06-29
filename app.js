@@ -48,7 +48,7 @@ function selCard(type, el) {
   haptic('light');
 }
 
-function selGend(el) {
+function pickGender(el) {
   document.querySelectorAll('.g-btn').forEach(b => b.classList.remove('sel'));
   el.classList.add('sel');
   selGend = el.dataset.v;
