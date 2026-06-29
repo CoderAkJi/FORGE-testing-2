@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#08080a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FORGE">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="styles.css">
+  <title>FORGE</title>
+  <!-- Supabase SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<!-- ============================================================
+     LOADING
+     ============================================================ -->
+<div id="loading">
+  <div class="load-ring"></div>
+  <div class="load-logo">FORGE</div>
+</div>
+
+<!-- Small sync indicator dot (top-right) -->
+<div id="sync-dot"></div>
+
+<!-- ============================================================
+     LOGIN (returning user on a new device)
+     ============================================================ -->
+<div id="login-screen" class="hidden">
+  <div class="ls-logo">FORGE</div>
+  <div class="ls-sub">Welcome back, Hunter</div>
+  <div class="ls-form">
+    <div class="ls-inp-wrap">
+      <input class="ls-inp" type="email" id="ls-email"
+        placeholder="Email" inputmode="email" autocomplete="email">
+    </div>
+    <div class="ls-inp-wrap">
+      <input class="ls-inp" type="password" id="ls-pass"
+        placeholder="Password" autocomplete="current-password">
+    </div>
+    <div class="ls-err" id="ls-err"></div>
+    <button class="btn btn-p" id="ls-btn" onclick="doLogin()">Sign In</button>
+    <button class="btn btn-g" onclick="showOb()">Create New Account</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     ONBOARDING (new user, 5 steps)
+     ============================================================ -->
+<div id="onboarding" class="hidden">
+  <div class="ob-prog"><div class="ob-pf" id="ob-pf" style="width:0%"></div></div>
+
+  <!-- Step 1: Welcome -->
+  <div class="ob-screen active" data-s="1">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center">
+      <div style="font-size:68px;font-weight:900;letter-spacing:-4px;margin-bottom:6px;
+        background:linear-gradient(135deg,#ff6b2b,#f5a623);
+        -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">
+        FORGE
+      </div>
+      <div style="font-size:12px;color:var(--text3);letter-spacing:3px;margin-bottom:44px">
+        YOUR JOURNEY BEGINS
+      </div>
+      <div style="font-size:46px;margin-bottom:22px">⚔️</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:12px;line-height:1.35">
+        Rise through the ranks.<br>Become the Shadow Monarch.
+      </div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.7">
+        Track every workout and meal. Earn XP.<br>
+        Evolve from E-Rank to S-Rank.
+      </div>
+    </div>
+    <div class="cta">
+      <button class="btn btn-p" onclick="nOb()">Begin Your Awakening →</button>
+      <button class="btn btn-g" onclick="showLogin()">I already have an account</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Goal -->
+  <div class="ob-screen" data-s="2">
+    <button class="ob-back" onclick="pOb()">←</button>
+    <div class="ob-step">1 / 5</div>
+    <div class="ob-icon">🎯</div>
+    <div class="ob-h">What's your main goal?</div>
+    <div class="ob-sub">Your workouts, calories, and macros all build around this.</div>
+    <div class="ob-cards" id="g-cards">
+      <div class="ob-card" data-v="lose_fat" onclick="selCard('goal', this)">
+        <div class="ob-ci">🔥</div>
+        <div class="ob-ct"><strong>Lose Fat</strong><span>Burn fat while keeping muscle. Cardio + calorie deficit.</span></div>
+      </div>
+      <div class="ob-card" data-v="build_muscle" onclick="selCard('goal', this)">
+        <div class="ob-ci">💪</div>
+        <div class="ob-ct"><strong>Build Muscle</strong><span>Gain size and strength. Progressive overload + surplus.</span></div>
+      </div>
+      <div class="ob-card" data-v="health" onclick="selCard('goal', this)">
+        <div class="ob-ci">❤️</div>
+        <div class="ob-ct"><strong>Stay Healthy</strong><span>Feel good, move well. Balanced training + nutrition.</span></div>
+      </div>
+    </div>
+    <div class="cta">
+      <button class="btn btn-p" id="g-next" disabled onclick="nOb()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Physique -->
+  <div class="ob-screen" data-s="3">
+    <button class="ob-back" onclick="pOb()">←</button>
+    <div class="ob-step">2 / 5</div>
+    <div class="ob-icon">🏆</div>
+    <div class="ob-h">Target physique?</div>
+    <div class="ob-sub">We'll build your workout plan around this.</div>
+    <div class="ob-cards" id="ph-cards">
+      <div class="ob-card" data-v="athletic" onclick="selCard('phys', this)">
+        <div class="ob-ci">⚡</div>
+        <div class="ob-ct"><strong>Athletic</strong><span>Speed, power and functional fitness</span></div>
+      </div>
+      <div class="ob-card" data-v="lean" onclick="selCard('phys', this)">
+        <div class="ob-ci">🌿</div>
+        <div class="ob-ct"><strong>Lean & Toned</strong><span>Definition with a fat-loss focus</span></div>
+      </div>
+      <div class="ob-card" data-v="strong" onclick="selCard('phys', this)">
+        <div class="ob-ci">🗿</div>
+        <div class="ob-ct"><strong>Strong & Big</strong><span>Maximum size and raw strength</span></div>
+      </div>
+      <div class="ob-card" data-v="balanced" onclick="selCard('phys', this)">
+        <div class="ob-ci">☯️</div>
+        <div class="ob-ct"><strong>Balanced</strong><span>Overall health and wellness</span></div>
+      </div>
+    </div>
+    <div class="cta">
+      <button class="btn btn-p" id="ph-next" disabled onclick="nOb()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Body Data -->
+  <div class="ob-screen" data-s="4">
+    <button class="ob-back" onclick="pOb()">←</button>
+    <div class="ob-step">3 / 5</div>
+    <div class="ob-icon">📏</div>
+    <div class="ob-h">Your body data</div>
+    <div class="ob-sub">Used to auto-calculate your calorie and macro targets. Never shared.</div>
+
+    <div class="ob-lbl">Gender</div>
+    <div class="g-row">
+      <div class="g-btn sel" data-v="male"   onclick="selGend(this)">Male</div>
+      <div class="g-btn"     data-v="female" onclick="selGend(this)">Female</div>
+    </div>
+
+    <div class="inp-row">
+      <div class="ob-ig">
+        <div class="ob-lbl">Age</div>
+        <input class="ob-inp" type="number" id="i-age"
+          placeholder="25" min="10" max="100" inputmode="numeric">
+      </div>
+      <div class="ob-ig">
+        <div class="ob-lbl">Weight (kg)</div>
+        <input class="ob-inp" type="number" id="i-wt"
+          placeholder="70" min="30" max="300" inputmode="decimal">
+      </div>
+    </div>
+    <div class="ob-ig">
+      <div class="ob-lbl">Height (cm)</div>
+      <input class="ob-inp" type="number" id="i-ht"
+        placeholder="175" min="100" max="250" inputmode="numeric">
+    </div>
+
+    <div class="cta">
+      <button class="btn btn-p" onclick="valBody()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 5: Activity -->
+  <div class="ob-screen" data-s="5">
+    <button class="ob-back" onclick="pOb()">←</button>
+    <div class="ob-step">4 / 5</div>
+    <div class="ob-icon">🏃</div>
+    <div class="ob-h">Activity level?</div>
+    <div class="ob-sub">How active are you right now in daily life?</div>
+    <div class="ob-cards" id="ac-cards">
+      <div class="ob-card" data-v="low" onclick="selCard('act', this)">
+        <div class="ob-ci">🛋️</div>
+        <div class="ob-ct"><strong>Low</strong><span>Mostly sitting — desk job, barely exercise</span></div>
+      </div>
+      <div class="ob-card" data-v="medium" onclick="selCard('act', this)">
+        <div class="ob-ci">🚶</div>
+        <div class="ob-ct"><strong>Moderate</strong><span>Light exercise 2-3 times per week</span></div>
+      </div>
+      <div class="ob-card" data-v="high" onclick="selCard('act', this)">
+        <div class="ob-ci">🏋️</div>
+        <div class="ob-ct"><strong>High</strong><span>Active job or training 4-5 times per week</span></div>
+      </div>
+    </div>
+    <div class="cta">
+      <button class="btn btn-p" id="ac-next" disabled onclick="nOb()">Continue →</button>
+    </div>
+  </div>
+
+  <!-- Step 6: Create Account -->
+  <div class="ob-screen" data-s="6">
+    <button class="ob-back" onclick="pOb()">←</button>
+    <div class="ob-step">5 / 5</div>
+    <div class="ob-icon">⚔️</div>
+    <div class="ob-h">Create your account</div>
+    <div class="ob-sub">Your data syncs to the cloud. Access it on any device, never lose your progress.</div>
+
+    <div class="ob-ig">
+      <div class="ob-lbl">Your Name</div>
+      <input class="ob-inp" type="text" id="i-name"
+        placeholder="Enter your name" autocomplete="name">
+    </div>
+    <div class="ob-ig">
+      <div class="ob-lbl">Email</div>
+      <input class="ob-inp" type="email" id="i-email"
+        placeholder="you@email.com" inputmode="email" autocomplete="email">
+    </div>
+    <div class="ob-ig">
+      <div class="ob-lbl">Password</div>
+      <input class="ob-inp" type="password" id="i-pass"
+        placeholder="Min 6 characters" autocomplete="new-password">
+    </div>
+
+    <div class="inp-err" id="ob-err"></div>
+
+    <div class="cta">
+      <button class="btn btn-p" id="ob-done" onclick="finishOb()">
+        Start My Journey 🔥
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MAIN APP
+     ============================================================ -->
+<div id="app" class="hidden">
+  <div id="content">
+    <!-- Rendered by JS based on active tab -->
+  </div>
+
+  <nav id="bnav">
+    <button class="nb on" data-t="home" onclick="tab('home')">
+      <div class="ni">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+      </div>
+      <div class="nl">HOME</div>
+    </button>
+
+    <button class="nb" data-t="workout" onclick="tab('workout')">
+      <div class="ni">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6.5 6.5h11M6.5 17.5h11M3 12h18"/>
+          <circle cx="3" cy="6.5" r="1.5"/>
+          <circle cx="3" cy="17.5" r="1.5"/>
+          <circle cx="21" cy="6.5" r="1.5"/>
+          <circle cx="21" cy="17.5" r="1.5"/>
+        </svg>
+      </div>
+      <div class="nl">TRAIN</div>
+    </button>
+
+    <button class="nb" data-t="nutrition" onclick="tab('nutrition')">
+      <div class="ni">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+          <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+          <line x1="6" y1="1" x2="6" y2="4"/>
+          <line x1="10" y1="1" x2="10" y2="4"/>
+          <line x1="14" y1="1" x2="14" y2="4"/>
+        </svg>
+      </div>
+      <div class="nl">FUEL</div>
+    </button>
+
+    <button class="nb" data-t="coach" onclick="tab('coach')">
+      <div class="ni">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </div>
+      <div class="nl">COACH</div>
+    </button>
+
+    <button class="nb" data-t="settings" onclick="tab('settings')">
+      <div class="ni">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </div>
+      <div class="nl">SETTINGS</div>
+    </button>
+  </nav>
+</div>
+
+<!-- ============================================================
+     MODAL (bottom sheet)
+     ============================================================ -->
+<div id="mod-ov" class="hidden" onclick="modBg(event)">
+  <div class="mod-sh" id="mod-sh">
+    <div class="mod-h"></div>
+    <div id="mod-c"></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     OVERLAYS
+     ============================================================ -->
+<div id="toast"></div>
+<div id="xp-pop"></div>
+
+<!-- Hidden file input for progress photos -->
+<input type="file" id="fi-photo" accept="image/*"
+  style="display:none" onchange="handlePhoto(event)">
+
+<!-- ============================================================
+     SCRIPTS (order matters — dependencies first)
+     ============================================================ -->
+<script src="data.js"></script>
+<script src="state.js"></script>
+<script src="calc.js"></script>
+<script src="supabase.js"></script>
+<script src="ui.js"></script>
+<script src="home.js"></script>
+<script src="workout.js"></script>
+<script src="nutrition.js"></script>
+<script src="coach.js"></script>
+<script src="settings.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
