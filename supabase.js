@@ -2,10 +2,18 @@
 // SUPABASE CLIENT
 // ============================================================
 const SB_URL = 'https://jfgmtyvjiioftitbzndk.supabase.co';
-const SB_KEY = 'sb_publishable_9Ykjdx16DA_DfxIxTzlMyg_XPyn-lAL';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpmZ210eXZqaWlvZnRpdGJ6bmRrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NDAxODYsImV4cCI6MjA5ODExNjE4Nn0.LKrRbCm5zUxPoxZ2FuJe-ascU4RGYzpMu5ioUHYQrG0';
 
-const { createClient } = window.supabase;
-const db = createClient(SB_URL, SB_KEY);
+// Guard: createClient must exist before we call it.
+// If Supabase CDN failed to load, fall back gracefully.
+let db = null;
+try {
+  if (window.supabase && window.supabase.createClient) {
+    db = window.supabase.createClient(SB_URL, SB_KEY);
+  }
+} catch (e) {
+  console.warn('Supabase failed to initialise:', e);
+}
 
 let currentUser = null;
 
@@ -21,7 +29,7 @@ function setSyncDot(state) {
 // WRITE TO CLOUD (background, never blocks UI)
 // ============================================================
 async function syncProfile() {
-  if (!currentUser) return;
+  if (!currentUser || !db) return;
   await db.from('profiles').upsert({
     id: currentUser.id,
     name: S.user.name, age: S.user.age,
@@ -34,7 +42,7 @@ async function syncProfile() {
 }
 
 async function syncProgress() {
-  if (!currentUser) return;
+  if (!currentUser || !db) return;
   await db.from('progress').upsert({
     id: currentUser.id,
     xp: S.progress.xp, level: S.progress.level,
@@ -45,7 +53,7 @@ async function syncProgress() {
 }
 
 async function syncTargets() {
-  if (!currentUser) return;
+  if (!currentUser || !db) return;
   await db.from('nutrition_targets').upsert({
     id: currentUser.id,
     calories: S.nutrition.targets.cal,
@@ -57,7 +65,7 @@ async function syncTargets() {
 }
 
 async function syncToCloud() {
-  if (!currentUser) return;
+  if (!currentUser || !db) return;
   setSyncDot('syncing');
   try {
     await Promise.all([syncProfile(), syncProgress(), syncTargets()]);
@@ -78,7 +86,7 @@ function scheduleSyncLater() {
 // LOG INDIVIDUAL EVENTS TO SUPABASE
 // ============================================================
 async function syncWorkoutLog(log) {
-  if (!currentUser) return;
+  if (!currentUser || !db) return;
   try {
     await db.from('workout_logs').insert({
       user_id: currentUser.id,
@@ -92,7 +100,7 @@ async function syncWorkoutLog(log) {
 }
 
 async function syncFoodLog(entry) {
-  if (!currentUser) return;
+  if (!currentUser || !db) return;
   try {
     await db.from('nutrition_logs').insert({
       user_id:   currentUser.id,
@@ -107,7 +115,7 @@ async function syncFoodLog(entry) {
 }
 
 async function syncWeightLog(w) {
-  if (!currentUser) return;
+  if (!currentUser || !db) return;
   try {
     await db.from('weight_logs').insert({
       user_id:   currentUser.id,
@@ -121,7 +129,7 @@ async function syncWeightLog(w) {
 // READ FROM CLOUD (on login / new device)
 // ============================================================
 async function hydrateFromCloud() {
-  if (!currentUser) return;
+  if (!currentUser || !db) return;
   try {
     const [{ data: prof }, { data: prog }, { data: tgt }, { data: cf }, { data: wl }] =
       await Promise.all([
@@ -165,7 +173,8 @@ async function hydrateFromCloud() {
     }
     save();
   } catch (e) {
-    // Offline — use whatever is in localStorage
+    // Offline or error — use whatever is in localStorage
+    console.warn('hydrateFromCloud failed:', e);
   }
 }
 
@@ -174,7 +183,21 @@ async function hydrateFromCloud() {
 // ============================================================
 async function checkAuth() {
   load();
+  // Always hide loading at the end, no matter what happens
+  const hideLoading = () => {
+    const el = document.getElementById('loading');
+    if (el) el.classList.add('hidden');
+  };
+
   try {
+    if (!db) {
+      // Supabase unavailable — run fully offline
+      if (S.user.name) { checkDecay(); updStreak(); showApp(); }
+      else showOb();
+      hideLoading();
+      return;
+    }
+
     const { data: { session } } = await db.auth.getSession();
     if (session) {
       currentUser = session.user;
@@ -183,19 +206,22 @@ async function checkAuth() {
       updStreak();
       showApp();
     } else {
-      // No session — first time or new device
       if (S.user.name) showLogin();
       else showOb();
     }
   } catch (e) {
+    console.warn('checkAuth error:', e);
     // Network error — fall back to local data
     if (S.user.name) { checkDecay(); updStreak(); showApp(); }
     else showOb();
+  } finally {
+    // ALWAYS hide loading, even if something threw unexpectedly
+    hideLoading();
   }
-  document.getElementById('loading').classList.add('hidden');
 }
 
 async function doLogin() {
+  if (!db) { document.getElementById('ls-err').textContent = 'No network connection.'; return; }
   const email = document.getElementById('ls-email').value.trim();
   const pass  = document.getElementById('ls-pass').value;
   const errEl = document.getElementById('ls-err');
@@ -221,23 +247,22 @@ async function doLogin() {
 }
 
 async function createAccount(name, email, pass) {
+  if (!db) throw new Error('No network connection. Try again when online.');
   const { data, error } = await db.auth.signUp({ email, password: pass });
   if (error) throw error;
   currentUser = data.user;
-
-  // Push initial profile & progress to Supabase
   await Promise.all([syncProfile(), syncProgress(), syncTargets()]);
 }
 
 async function signOut() {
-  await db.auth.signOut();
+  if (db) await db.auth.signOut();
   currentUser = null;
   localStorage.removeItem('forge4');
   location.reload();
 }
 
 async function deleteAccount() {
-  if (currentUser) {
+  if (currentUser && db) {
     try {
       const uid = currentUser.id;
       await Promise.all([
